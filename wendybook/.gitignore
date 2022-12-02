@@ -1,0 +1,6 @@
+# Ignore All (xlsx) files
+*.xlsx
+
+# Ignore All (png) files
+*.png
+*.jpg
