@@ -36,14 +36,16 @@ class Load:
             elif 'win32' in platform:
                 if image: pass
                 else: 
-                    chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
                     prefs = {"profile.managed_default_content_settings.images": 2}
                     chrome_opt.add_experimental_option("prefs", prefs)
                     
+                chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"]) # shut down error msg
                 chrome_opt.add_argument('--start-maximized')
 
                 if os.getlogin() == 'jhun1':
                     seleniumPath = r'C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32\chromedriver'
+                elif os.getlogin() == 'snukh':
+                    seleniumPath = r'C:\Users\snukh\Downloads\chromedriver_win32\chromedriver'
                 else:
                     raise ValueError('Define driver path in this device')
         else:
