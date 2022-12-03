@@ -18,23 +18,34 @@ chrome_opt = webdriver.ChromeOptions()
 
 
 class Load:
-    def __init__(self, USER, # input user name
-                    ):
+    def __init__(self, USER, image=False):
+        '''
+        1. USER(str): verifying user name
+        2. image(boolean): on/off image option 
+        '''
         print('Current OS : ', platform)
+        print('Current OS username: ', os.getlogin())
 
         if USER == 'huni1023':
             if 'darwin' in platform:
                 seleniumPath = '/Users/huni/Dropbox/내 Mac (MacBook-Pro.local)/Downloads/chromedriver'
-                chrome_opt.add_argument('--kiosk')
+                if image: pass
+                else: 
+                    chrome_opt.add_argument('--kiosk')
 
             elif 'win32' in platform:
-                # to unable image
-                chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
-                prefs = {"profile.managed_default_content_settings.images": 2}
-                chrome_opt.add_experimental_option("prefs", prefs)
+                if image: pass
+                else: 
+                    chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
+                    prefs = {"profile.managed_default_content_settings.images": 2}
+                    chrome_opt.add_experimental_option("prefs", prefs)
+                    
                 chrome_opt.add_argument('--start-maximized')
 
-                seleniumPath = r'C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32\chromedriver'
+                if os.getlogin() == 'jhun1':
+                    seleniumPath = r'C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32\chromedriver'
+                else:
+                    raise ValueError('Define driver path in this device')
         else:
             raise ValueError('Set User name and exrtra argument')
             
