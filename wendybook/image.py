@@ -72,17 +72,25 @@ class Crawler(Load):
         print('crawling done : error count is ', len(self.error_bookNumber))
         return self.error_bookNumber
 
-    def unit_text_crawler(self):
+    @staticmethod
+    def writer(list_to_write):
+        with open(os.path.join(os.getcwd(), 'not_crawled.txt'), 'w') as f:
+            for line in list_to_write:
+                f.write(f"{line}\n")
+        return None
+
+    def unit_text_crawler(self, howManyRandomBook=100):
         '''
         test crawler in various situation
         '''
         print('\n\n>>>> Crawling random 100 book')
 
-        random_idx = random.sample(range(0, self.book.shape[0]), 100)
+        random_idx = random.sample(range(0, self.book.shape[0]), howManyRandomBook)
         sample_df = self.book.iloc[random_idx, :]
         error_book_ls = Crawler.looper(self=self, url_ls= sample_df['도서번호'].values)
         
         self.driver.quit()
+        Crawler.writer(error_book_ls)
         return error_book_ls
 
     def full_carwler(self):
@@ -90,6 +98,7 @@ class Crawler(Load):
         error_book_ls = Crawler.looper(self=self, url_ls=self.book['도서번호'].values) 
         
         self.driver.quit()
+        Crawler.writer(error_book_ls)
         return error_book_ls
 
 
