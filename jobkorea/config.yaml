@@ -1,0 +1,5 @@
+init_url: https://www.jobkorea.co.kr/recruit/joblist?menucode=local&localorder=1
+selen_path:
+  home: C:\Users\jhun1\Dropbox\PC (4)\Downloads\chromedriver_win32\chromedriver
+  laptop: ./
+  khrrc: ./
