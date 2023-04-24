@@ -1,5 +1,15 @@
-init_url: https://www.jobkorea.co.kr/recruit/joblist?menucode=local&localorder=1
+raw_data: raw_data(convert).xlsx
+init_url: https://www.jobkorea.co.kr/
 selen_path:
-  home: C:\Users\jhun1\Dropbox\PC (4)\Downloads\chromedriver_win32\chromedriver
-  laptop: ./
+  home: C:\Users\jhun1\Dropbox\PC (4)\Downloads\chromedriver_win32_(1)\chromedriver
+  laptop: C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32
   khrrc: ./
+solution:
+  cafe: "cafe24.com"
+  고도: "godo"
+  식스샾: "sixshop"
+  wordpress: "woocommerce"
+  Wisa: "wisa"
+  메이크샵: "makeshop"
+  아임웹: "imweb"
+

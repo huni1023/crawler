@@ -1,4 +1,4 @@
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, WebDriverException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -6,11 +6,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
 import os, sys, time
 import re
+import copy
 import argparse
 import warnings
+import shutil
 import pandas as pd
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
+
 
 # set utils
 util_path = os.pardir
@@ -23,8 +26,10 @@ from utils.helper import load_config
 Project_PATH = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 CONFIG_PATH = "config.yaml"
 config = load_config(os.path.join(Project_PATH, 'jobkorea', CONFIG_PATH))
-selen_path_dict = config['selen_path']
+raw_data = pd.read_excel(config['raw_data'], engine='openpyxl')
 init_url = config['init_url']
+selen_path_dict = config['selen_path']
+solutions = config['solution']
 
 # argument
 parser = argparse.ArgumentParser(description='crawling job korea')
@@ -36,7 +41,8 @@ parser.add_argument('--khrrc', action='store_true',
                     help="crawling on khrrc device")
 parser.add_argument('--save', action='store_true',
                     help="save result")
-args = parser.parse_args()
+args = parser.parse_args('')
+
 
 # chrome option
 chrome_opt = webdriver.ChromeOptions()
@@ -47,7 +53,7 @@ chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
 
 
 class Crawler:
-    def __init__(self, selen_path, chromeOption, init_url):
+    def __init__(self, selen_path, chromeOption, init_url, solutions):
         r"""
         Parameters
         ----------
@@ -57,80 +63,147 @@ class Crawler:
             chrome browser options
         init_url : str
             initial url
+        solutions: list
+            list of solutions
         """
         self.driver = webdriver.Chrome(
             executable_path = selen_path, chrome_options=chromeOption
         )
         self.ACC = ActionChains(self.driver)
         self.init_url = init_url
-    
-    def init_table_setting(self, tag: str):
-        r"""crawling corportaion information
+        self.solutions = solutions
+
+    def search_corporation(self):
+        r"""search corporation title in search bar
+        """
+        # type title text
+        # //*[@id="stext"]
+
+        # press enter
+        # press "기업정보" button
+        # if empty: type NaN
+        # else if(list less than 10): find match list in xlsx
+        # else if(list more than 10): press next page and find match list in xlsx --> 차라리 일단 패스하는게..
+        pass
+
+    def search_channel_and_solution(self, shopping_mall_url, channel_talk):
+        r"""search if solution and platform
         Parameters
         ----------
-        tag: str
-            corporation type string
+        shopping_mall_url: str
+            url of shopping mall
+        channel_talk: str
+            whether channel talk is existed or not
         """
-        self.driver.get(self.init_url)
-        time.sleep(2)
-        tagBox = self.driver.find_element(By.XPATH, '//*[@id="anchorGICnt_1"]')
-        tag_ls = tagBox.find_elements(By.TAG_NAME, "li")
+        result = {'사용솔루션': '', '채널톡사용여부': ''}
+
+        # enter url
+        try:            
+            self.driver.get(url = shopping_mall_url)
+            html = self.driver.page_source
+            
+            # search channel talk
+            if html.find(channel_talk) != -1:
+                result['채널톡사용여부'] += 'Y' 
         
-        for idx, each_tag_li in enumerate(tag_ls):
-            each_tag = each_tag_li.find_element(By.XPATH, f'//*[@id="anchorGICnt_1"]/li[{idx+1}]/button/span').text
-            if each_tag == tag:
-                each_tag_li.click()
-                # count = each_tag_li.find_element(By.TAG_NAME, 'em').text
-                # print(re.sub('^[0-9]', '', count))
+            else:
+                result['채널톡사용여부'] += 'N'
 
-        #!# corporation count setting should be updated
-
-        corporation_table = self.driver.find_element(By.XPATH, '//*[@id="dev-gi-list"]/div/div[5]/table/tbody')
-        corporation_rows = corporation_table.find_elements(By.TAG_NAME, 'tr')
-
-        corp_dict = {'title': list(),'link': list()}
-        for idx, each_corporation in enumerate(corporation_rows):
-            corp_title_ele = each_corporation.find_element(By.CLASS_NAME, 'tplCo')
-            corp_href = corp_title_ele.find_element(By.TAG_NAME, 'a').get_attribute('href')
-            # print('>> goal: ', corp_href)
-            corp_dict['title'].append(corp_title_ele.text)
-            corp_dict['link'].append(corp_href)
-
+            # search solution
+            for solution in solutions:
+                if html.find(solution) != -1:
+                    if len(result['사용솔루션']) == 0:
+                        result['사용솔루션'] += solution
+                    else:
+                        multi_solution = ', ' + solution
+                        result['사용솔루션'] += multi_solution
+                else:
+                    result['사용솔루션'] = 'N'
+            
+            return result
+        except WebDriverException:
+            result['사용솔루션'] = 'error'
+            result['채널톡사용여부'] = 'error'
+            return result
         
-        return pd.DataFrame.from_dict(corp_dict)
-    
-    def D2(self, ):
-        return NotImplementedError
 
-    def quit(self):
-        r"""A simple function to quit driver
-        
+
+class Utills:
+    def __init__(self, raw_data):
+        self.raw_data = raw_data
+
+    def add_empty_column(self, column_ls):
+        r"""add empty column for further processing
+        column_ls: list
+            list of columns to be entered
         """
-        self.driver.quit()
+        # add text column
+        rs = copy.deepcopy(self.raw_data)
+        for column in column_ls:
+            rs[column] = '' 
+        
+        return rs
+
+    def cleaning_url(self, data):
+        r"""add https:// in url
+        Parameters
+        ----------
+        data: pd.Dataframe
+            pandas dataframe
+        """
+        rs = copy.deepcopy(data)
+        new_url_ls = list()
+        for url in rs['도메인명']:
+            if url[:8] != 'https://':
+                new_url_ls.append('https://' + url)
+            elif url[:7] == 'http://':
+                new_url_ls.append('https://' + url)
+            else:
+                new_url_ls.append(url)
+        
+        rs['도메인명'] = new_url_ls
+        return rs
+
+    def compare_progress(self, target, interrupted_data, column):
+        r"""compare target and interrupted result and generate which is left
+        target : str
+            data path to target data
+        interrupted_data: str
+            data path to interrupted data
+        column : str
+            which column should be used as a comparison criteria 
+        """
+        df_target = pd.read_excel(target)
+        df_interrupted = pd.read_excel(interrupted_data)
+        # find first row where NaN exists
+        threshold = 0 #!#
+        
+        # and then cut the df_target
+        return df_target.iloc[threshold, :]
+
+    # def create_zip(self, file_name, full_directory):
+    #     r"""Simple function create zip files
+    #     """
+    #     shutil.make_archive(file_name, 'zip', full_directory)
     
+
 
 if __name__ == '__main__':
     if args.home:
         crawler = Crawler(selen_path = selen_path_dict['home'],
                           chromeOption=chrome_opt,
-                          init_url=init_url)
+                          init_url=init_url,
+                          solutions = solutions)
     elif args.laptop:
         crawler = Crawler(selen_path = selen_path_dict['laptop'],
                           chromeOption=chrome_opt,
-                          init_url=init_url)
+                          init_url=init_url,
+                          solutions = solutions)
     elif args.khrrc:
         crawler = Crawler(selen_path = selen_path_dict['khrrc'],
                           chromeOption=chrome_opt,
-                          init_url=init_url)
+                          init_url=init_url, 
+                          solutions = solutions)
     else:
         raise NotImplementedError
     
-    df = crawler.init_table_setting(tag = '외국계')
-    
-    if args.save:
-        df.to_excel(os.path.join(Project_PATH, 'jobkorea', 'result', 'pilot.xlsx'))
-    # crawler.quit()
-    
-
-
-
