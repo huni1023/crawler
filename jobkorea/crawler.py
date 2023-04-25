@@ -41,7 +41,8 @@ parser.add_argument('--khrrc', action='store_true',
                     help="crawling on khrrc device")
 parser.add_argument('--save', action='store_true',
                     help="save result")
-args = parser.parse_args('')
+args = parser.parse_args('') #!# jupytor notebook case
+# args = parser.parse_args()
 
 
 # chrome option
@@ -110,16 +111,21 @@ class Crawler:
                 result['채널톡사용여부'] += 'N'
 
             # search solution
-            for solution in solutions:
-                if html.find(solution) != -1:
+            for solution, search_str in self.solutions.items():
+                print('>> search_string: ', search_str)
+                if html.find(search_str) != -1:
+                    print('>> success search: ', solution)
                     if len(result['사용솔루션']) == 0:
                         result['사용솔루션'] += solution
                     else:
                         multi_solution = ', ' + solution
                         result['사용솔루션'] += multi_solution
                 else:
+                    pass
+                
+                # in case of nothing
+                if len(result['사용솔루션']) == 0:
                     result['사용솔루션'] = 'N'
-            
             return result
         except WebDriverException:
             result['사용솔루션'] = 'error'
