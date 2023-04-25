@@ -10,7 +10,7 @@ def load_config(config_path: str) -> dict:
     config_path : str
         the path of yaml configuration file
     """
-    with open(config_path) as file:
+    with open(config_path, encoding='UTF8') as file:
         config = yaml.safe_load(file)
 
     return config

@@ -3,7 +3,7 @@ init_url: https://www.jobkorea.co.kr/
 selen_path:
   home: C:\Users\jhun1\Dropbox\PC (4)\Downloads\chromedriver_win32_(1)\chromedriver
   laptop: C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32
-  khrrc: ./
+  khrrc: C:\Users\snukh\Downloads\chromedriver
 solution:
   cafe: "cafe24.com"
   고도: "godo"
