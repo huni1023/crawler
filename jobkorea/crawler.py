@@ -1,6 +1,7 @@
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, WebDriverException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
@@ -74,18 +75,106 @@ class Crawler:
         self.init_url = init_url
         self.solutions = solutions
 
-    def search_corporation(self):
+    def search_corporation(self, search_corporation ):
         r"""search corporation title in search bar
         """
-        # type title text
-        # //*[@id="stext"]
+        def string_to_int(string):
+            new_str = re.sub('^[0-9]', '', string)
+            return int(new_str)
 
-        # press enter
-        # press "기업정보" button
-        # if empty: type NaN
-        # else if(list less than 10): find match list in xlsx
-        # else if(list more than 10): press next page and find match list in xlsx --> 차라리 일단 패스하는게..
-        pass
+        def cleaning_string(string):
+            return string.replace('㈜', '')
+        
+        def compare_two_string(string1, string2):
+            if string1.find(' ') != -1:
+                string1 = re.sub(' ', '', string1)
+            elif string2.find(' ') != -1:
+                string2 = re.sub(' ', '', string2)
+            else:
+                if string1 == string2:
+                    return True
+                else:
+                    return False
+            
+            if string1 == string2:
+                return True
+            else:
+                return False
+
+        try:
+            # type title text
+            self.driver.get(self.init_url)
+            
+            # 
+            self.driver.find_element(By.XPATH, '//*[@id="stext"]')
+            self.driver.send_keys(search_corporation)
+            self.driver.send_keys(Keys.ENTER)
+            self.driver.implicitly_wait(10) # wait 10seconds
+        
+            # press "기업정보" button
+            buttonEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[1]/div/button[2]')
+            buttonEle.click()
+
+            # count corporation list
+            count_str = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[2]/div[1]/p/strong').text
+            searched_corp_count = string_to_int(count_str)
+
+            # table
+            tableEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[2]/div[2]/div/div[1]/ul')
+            corp_ls = tableEle.find_elements(By.TAG_NAME, 'li')
+
+            if searched_corp_count == 0 :
+                return [0, 'error'] # no need for further crawling
+            else:
+                for corporation in corp_ls:
+                    a_tag = corporation.find_element(By.TAG_NAME, 'a')
+                    corporation_name = a_tag.get_attribute('title')
+                    cleaned_corporation_name = cleaning_string(corporation_name)
+                    if compare_two_string(search_corporation, cleaned_corporation_name):
+                        corporation_url = a_tag.get_attribute('href')
+                        return [searched_corp_count, corporation_url]
+                    else:
+                        pass
+
+                if searched_corp_count < 11:
+                    return [searched_corp_count, 'error1']
+                    
+                else:
+                    return [searched_corp_count, 'error2']
+            
+        except WebDriverException:
+            return ['error', 'error']
+    
+    def search_corporation_info(self, href):
+        r"""search corporation information
+        """
+        try:
+            self.driver.get(href)
+            tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
+            table_rows = tableEle.find_elements(By.TAG_NAME, 'th')
+            first_three_rows = table_rows[:3]
+            
+            # parsing data
+            rs = {'매출수': '', '사원수': '', '설립일': ''}
+            for idx, row in enumerate(first_three_rows):
+                if idx == 0 :
+                    td_ls = row.find_elements(By.TAG_NAME, 'td')
+                    employee_count_row = td_ls[-1]
+                    rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value')
+                elif idx == 1:
+                    td_ls = row.find_element(By.TAG_NAME, 'td')
+                    open_date = td_ls[-1]
+                    rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value')
+                elif idx == 2:
+                    td_ls = row.find_element(By.TAG_NAME, 'td')
+                    sales = td_ls[-1]
+                    rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value')
+            return rs
+                
+
+        except WebDriverException:
+            return {'매출수': 'error', '사원수': 'error', '설립일': 'error'}
+
 
     def search_channel_and_solution(self, shopping_mall_url, channel_talk):
         r"""search if solution and platform
@@ -137,6 +226,14 @@ class Crawler:
 class Utills:
     def __init__(self, raw_data):
         self.raw_data = raw_data
+
+    def clear_useless_text(self, column_name):
+        r"""cleaning useless text
+        Parameters
+        ----------
+        column_name: str
+        """
+        self.raw_data[column_name].apply(lambda x: re.sub('', '', x))
 
     def add_empty_column(self, column_ls):
         r"""add empty column for further processing
