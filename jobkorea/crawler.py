@@ -151,7 +151,7 @@ class Crawler:
         try:
             self.driver.get(href)
             tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
-            table_rows = tableEle.find_elements(By.TAG_NAME, 'th')
+            table_rows = tableEle.find_elements(By.TAG_NAME, 'tr')
             first_three_rows = table_rows[:3]
             
             # parsing data
@@ -159,16 +159,22 @@ class Crawler:
             for idx, row in enumerate(first_three_rows):
                 if idx == 0 :
                     td_ls = row.find_elements(By.TAG_NAME, 'td')
-                    employee_count_row = td_ls[-1]
-                    rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value')
+                    for idx, td in enumerate(td_ls):
+                        if idx == 1:
+                            employee_count_row = td
+                            rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value').text
                 elif idx == 1:
-                    td_ls = row.find_element(By.TAG_NAME, 'td')
-                    open_date = td_ls[-1]
-                    rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value')
+                    td_ls = row.find_elements(By.TAG_NAME, 'td')
+                    for idx, td in enumerate(td_ls):
+                        if idx == 1:
+                            open_date = td
+                            rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value').text
                 elif idx == 2:
-                    td_ls = row.find_element(By.TAG_NAME, 'td')
-                    sales = td_ls[-1]
-                    rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value')
+                    td_ls = row.find_elements(By.TAG_NAME, 'td')
+                    for idx, td in enumerate(td_ls):
+                        if idx == 1:
+                            sales = td
+                            rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value').text
             return rs
                 
 
