@@ -12,4 +12,6 @@ solution:
   Wisa: "wisa"
   메이크샵: "makeshop"
   아임웹: "imweb"
+platform:
+  ["naver.com", "coupang", "11st", "interpark", "gmarket"]
 

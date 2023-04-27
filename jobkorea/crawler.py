@@ -31,6 +31,7 @@ raw_data = pd.read_excel(config['raw_data'], engine='openpyxl')
 init_url = config['init_url']
 selen_path_dict = config['selen_path']
 solutions = config['solution']
+platform_string = config['platform']
 
 # argument
 parser = argparse.ArgumentParser(description='crawling job korea')
@@ -55,7 +56,7 @@ chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
 
 
 class Crawler:
-    def __init__(self, selen_path, chromeOption, init_url, solutions):
+    def __init__(self, selen_path, chromeOption, init_url, solutions, platform_string):
         r"""
         Parameters
         ----------
@@ -67,6 +68,8 @@ class Crawler:
             initial url
         solutions: list
             list of solutions
+        platform_string : list
+            list of platform strings
         """
         self.driver = webdriver.Chrome(
             executable_path = selen_path, chrome_options=chromeOption
@@ -74,6 +77,7 @@ class Crawler:
         self.ACC = ActionChains(self.driver)
         self.init_url = init_url
         self.solutions = solutions
+        self.platform_string = platform_string
 
     def search_corporation(self, search_corporation ):
         r"""search corporation title in search bar
@@ -186,7 +190,7 @@ class Crawler:
             return {'매출수': 'error', '사원수': 'error', '설립일': 'error'}
 
 
-    def search_channel_and_solution(self, shopping_mall_url, channel_talk):
+    def search_shopping_mall(self, shopping_mall_url, channel_talk):
         r"""search if solution and platform
         Parameters
         ----------
@@ -195,7 +199,7 @@ class Crawler:
         channel_talk: str
             whether channel talk is existed or not
         """
-        result = {'사용솔루션': '', '채널톡사용여부': ''}
+        result = {'플랫폼입점여부': '', '사용솔루션': '', '채널톡사용여부': ''}
 
         # enter url
         try:            
@@ -211,9 +215,7 @@ class Crawler:
 
             # search solution
             for solution, search_str in self.solutions.items():
-                print('>> search_string: ', search_str)
                 if html.find(search_str) != -1:
-                    print('>> success search: ', solution)
                     if len(result['사용솔루션']) == 0:
                         result['사용솔루션'] += solution
                     else:
@@ -225,12 +227,54 @@ class Crawler:
                 # in case of nothing
                 if len(result['사용솔루션']) == 0:
                     result['사용솔루션'] = 'N'
+            
+            # search platform
+            for platform in self.platform_string:
+                if html.find(platform) != -1:
+                    result['플랫폼입점여부'] += 'Y'
+                    break 
+                else:
+                    pass
+            if result['플랫폼입점여부'] == '':
+                result['플랫폼입점여부'] += 'N'
+
             return result
         except WebDriverException:
+            result['플랫폼입점여부'] = 'error'
             result['사용솔루션'] = 'error'
             result['채널톡사용여부'] = 'error'
             return result
-        
+    
+    
+    #!# in case of emergency
+    def search_platform(self, shopping_mall_url):
+        r"""search platform based on previous result
+        Parameters
+        ----------
+        shopping_mall_url: str
+            url of shopping mall
+        """
+        result = {'플랫폼입점여부': ''}
+
+        # enter url
+        try:            
+            self.driver.get(url = shopping_mall_url)
+            html = self.driver.page_source
+            
+            # search platform
+            for platform in self.platform_string:
+                if html.find(platform) != -1:
+                    result['플랫폼입점여부'] += 'Y'
+                    break 
+                else:
+                    pass
+            if result['플랫폼입점여부'] == '':
+                result['플랫폼입점여부'] += 'N'
+
+            return result
+        except WebDriverException:
+            result['플랫폼입점여부'] = 'error'
+            return result
 
 
 class Utills:
@@ -307,17 +351,20 @@ if __name__ == '__main__':
         crawler = Crawler(selen_path = selen_path_dict['home'],
                           chromeOption=chrome_opt,
                           init_url=init_url,
-                          solutions = solutions)
+                          solutions = solutions,
+                          platform_string = platform_string)
     elif args.laptop:
         crawler = Crawler(selen_path = selen_path_dict['laptop'],
                           chromeOption=chrome_opt,
                           init_url=init_url,
-                          solutions = solutions)
+                          solutions = solutions,
+                          platform_string = platform_string)
     elif args.khrrc:
         crawler = Crawler(selen_path = selen_path_dict['khrrc'],
                           chromeOption=chrome_opt,
                           init_url=init_url, 
-                          solutions = solutions)
+                          solutions = solutions,
+                          platform_string = platform_string)
     else:
         raise NotImplementedError
     
