@@ -79,8 +79,12 @@ class Crawler:
         r"""search corporation title in search bar
         """
         def string_to_int(string):
-            new_str = re.sub('^[0-9]', '', string)
-            return int(new_str)
+            new_str = re.sub('[^0-9]', '', string)
+            print('이 자식: ', new_str)
+            if new_str == '':
+                return 0
+            else:
+                return int(new_str)
 
         def cleaning_string(string):
             return string.replace('㈜', '')
@@ -106,9 +110,9 @@ class Crawler:
             self.driver.get(self.init_url)
             
             # 
-            self.driver.find_element(By.XPATH, '//*[@id="stext"]')
-            self.driver.send_keys(search_corporation)
-            self.driver.send_keys(Keys.ENTER)
+            inputEle = self.driver.find_element(By.XPATH, '//*[@id="stext"]')
+            inputEle.send_keys(search_corporation)
+            inputEle.send_keys(Keys.ENTER)
             self.driver.implicitly_wait(10) # wait 10seconds
         
             # press "기업정보" button
@@ -116,7 +120,7 @@ class Crawler:
             buttonEle.click()
 
             # count corporation list
-            count_str = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[2]/div[1]/p/strong').text
+            count_str = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]/div[1]/p/strong').text
             searched_corp_count = string_to_int(count_str)
 
             # table
@@ -240,6 +244,7 @@ class Utills:
         column_name: str
         """
         self.raw_data[column_name].apply(lambda x: re.sub('', '', x))
+        return self.raw_data['상호']
 
     def add_empty_column(self, column_ls):
         r"""add empty column for further processing
