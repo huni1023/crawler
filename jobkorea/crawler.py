@@ -84,7 +84,6 @@ class Crawler:
         """
         def string_to_int(string):
             new_str = re.sub('[^0-9]', '', string)
-            print('이 자식: ', new_str)
             if new_str == '':
                 return 0
             else:
