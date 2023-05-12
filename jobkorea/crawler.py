@@ -11,6 +11,7 @@ import copy
 import argparse
 import warnings
 import shutil
+import platform
 import pandas as pd
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
@@ -41,10 +42,12 @@ parser.add_argument('--laptop', action='store_true',
                     help="crawling on laptop device")
 parser.add_argument('--khrrc', action='store_true',
                     help="crawling on khrrc device")
+parser.add_argument('--ubuntu', action='store_true',
+                    help="crawling on ubuntu device")
 parser.add_argument('--save', action='store_true',
                     help="save result")
-args = parser.parse_args('') #!# jupytor notebook case
-# args = parser.parse_args()
+# args = parser.parse_args('') #!# jupytor notebook case
+args = parser.parse_args()
 
 
 # chrome option
@@ -53,6 +56,16 @@ prefs = {"profile.managed_default_content_settings.images": 2}
 chrome_opt.add_experimental_option("prefs", prefs) 
 chrome_opt.add_experimental_option("detach", True) # prevent automatically closed tab
 chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+if platform.system() == 'Linux':
+    chrome_opt.add_argument('--no-sandbox')
+    chrome_opt.add_argument('--headless') # it should be run without UI (Headless)
+    chrome_opt.add_argument('--disable-dev-shm-usage')
+    chrome_opt.add_argument('window-size=1920x1080')
+    chrome_opt.add_argument('disable-gpu')
+    
+    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
+    chrome_opt.add_argument(f'user-agent={user_agent}')
 
 
 class Crawler:
@@ -275,9 +288,17 @@ class Crawler:
             result['플랫폼입점여부'] = 'error'
             return result
 
+    def test_driver(self):
+        r"""test function: chrome webdriver"""
+        self.driver.get('https://www.naver.com')
+        if 'https://www.naver.com/' == self.driver.current_url:
+            return print('>> test passed: chrome webdriver')
+        else:
+            raise ValueError('** test failed: chrome webdriver')
 
 class Utills:
     def __init__(self, raw_data):
+        r"""helper function cleaning data"""
         self.raw_data = raw_data
 
     def clear_useless_text(self, column_name):
@@ -364,6 +385,13 @@ if __name__ == '__main__':
                           init_url=init_url, 
                           solutions = solutions,
                           platform_string = platform_string)
+    elif args.ubuntu:
+        crawler = Crawler(selen_path= selen_path_dict['ubuntu'],
+                    chromeOption = chrome_opt,
+                    init_url = init_url,
+                    solutions =solutions,
+                    platform_string = platform_string)
+        crawler.driver.get('https://www.naver.com')
     else:
         raise NotImplementedError
     
