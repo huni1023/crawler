@@ -232,9 +232,9 @@ class Crawler:
                 else:
                     pass
                 
-                # in case of nothing
-                if len(result['사용솔루션']) == 0:
-                    result['사용솔루션'] = 'N'
+            # in case of nothing
+            if result['사용솔루션'] == '':
+                result['사용솔루션'] = 'N'
             
             # search platform
             for platform in self.platform_string:
@@ -243,6 +243,7 @@ class Crawler:
                     break 
                 else:
                     pass
+            # in case of nothing
             if result['플랫폼입점여부'] == '':
                 result['플랫폼입점여부'] += 'N'
 
@@ -253,36 +254,6 @@ class Crawler:
             result['채널톡사용여부'] = 'error'
             return result
     
-    
-    #!# in case of emergency
-    def search_platform(self, shopping_mall_url):
-        r"""search platform based on previous result
-        Parameters
-        ----------
-        shopping_mall_url: str
-            url of shopping mall
-        """
-        result = {'플랫폼입점여부': ''}
-
-        # enter url
-        try:            
-            self.driver.get(url = shopping_mall_url)
-            html = self.driver.page_source
-            
-            # search platform
-            for platform in self.platform_string:
-                if html.find(platform) != -1:
-                    result['플랫폼입점여부'] += 'Y'
-                    break 
-                else:
-                    pass
-            if result['플랫폼입점여부'] == '':
-                result['플랫폼입점여부'] += 'N'
-
-            return result
-        except WebDriverException:
-            result['플랫폼입점여부'] = 'error'
-            return result
 
     def test_driver(self):
         r"""test function: chrome webdriver"""
@@ -316,26 +287,31 @@ class Utills:
         for column in column_ls:
             rs[column] = '' 
         
+        self.cleaned_data = rs
         return rs
 
-    def cleaning_url(self, data):
-        r"""add https:// in url
+    
+    def cleanUrl(self):
+        r"""cleaning url
         Parameters
         ----------
-        data: pd.Dataframe
-            pandas dataframe
         """
-        rs = copy.deepcopy(data)
+        rs = copy.deepcopy(self.raw_data)
         new_url_ls = list()
         for url in rs['도메인명']:
-            if url[:8] != 'https://':
-                new_url_ls.append('https://' + url)
-            elif url[:7] == 'http://':
-                new_url_ls.append('https://' + url)
+            if url.find('http') != -1:
+                # case1. http
+                if url[:7] == 'http://':
+                    new_url_ls.append('https://' + url[7:])
+                else:
+                    new_url_ls.append(url)
+            
+            # case2. no http
             else:
-                new_url_ls.append(url)
+                new_url_ls.append('https://' + url)
         
         rs['도메인명'] = new_url_ls
+        self.cleaned_data = rs
         return rs
 
     def compare_progress(self, target, interrupted_data, column):
@@ -388,6 +364,10 @@ if __name__ == '__main__':
                     solutions =solutions,
                     platform_string = platform_string)
         crawler.test_driver()
+
+        utils = Utills(raw_data = raw_data)
+        utils.cleanUrl()
+        
     else:
         raise NotImplementedError
     
