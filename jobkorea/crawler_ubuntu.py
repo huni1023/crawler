@@ -85,18 +85,18 @@ def full_crawling(crawler_obj, to_crawl_data):
     rs = copy.deepcopy(to_crawl_data)
 
     for idx, row in tqdm(to_crawl_data.iterrows()):
-        if idx < 20:
-            crawled = crawler_obj.search_shopping_mall(
-                shopping_mall_url = row['도메인명'],
-                channel_talk = 'channel.io'
-            )
-            rs.loc[idx, '플랫폼입점여부'] = crawled['플랫폼입점여부']
-            rs.loc[idx, '사용솔루션'] = crawled['사용솔루션']
-            rs.loc[idx, '채널톡사용여부'] = crawled['채널톡사용여부']
+        
+        crawled = crawler_obj.search_shopping_mall(
+            shopping_mall_url = row['도메인명'],
+            channel_talk = 'channel.io'
+        )
+        rs.loc[idx, '플랫폼입점여부'] = crawled['플랫폼입점여부']
+        rs.loc[idx, '사용솔루션'] = crawled['사용솔루션']
+        rs.loc[idx, '채널톡사용여부'] = crawled['채널톡사용여부']
             
 
-        # if idx % 2000 == 1999:
-        if idx == 1999:
+        if idx % 2000 == 1999:
+        # if idx == 1999:
             rs.to_excel(os.path.join(Save_PATH, f'log_{idx}_shoppingmall.xlsx'), index=False)
             print(f'>> 중간저장: {idx}', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     

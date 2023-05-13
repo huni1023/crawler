@@ -48,3 +48,7 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+
+# etc
+jobkorea/crawler_ubuntu.py:Zone.Identifier
+jobkorea/crawler_ubuntu.py:com.dropbox.attrs
