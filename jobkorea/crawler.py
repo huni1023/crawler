@@ -31,6 +31,7 @@ config = load_config(os.path.join(Project_PATH, 'jobkorea', CONFIG_PATH))
 raw_data = pd.read_excel(config['raw_data'], engine='openpyxl')
 init_url = config['init_url']
 selen_path_dict = config['selen_path']
+chrome_opt_dict = config['chrome_option']
 solutions = config['solution']
 platform_string = config['platform']
 
@@ -52,20 +53,15 @@ args = parser.parse_args()
 
 # chrome option
 chrome_opt = webdriver.ChromeOptions()
-prefs = {"profile.managed_default_content_settings.images": 2}
-chrome_opt.add_experimental_option("prefs", prefs) 
-chrome_opt.add_experimental_option("detach", True) # prevent automatically closed tab
-chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
+for _ in chrome_opt_dict['default']:
+    chrome_opt.add_argument(_)
+# chrome_opt.add_experimental_option("detach", True) # prevent automatically closed tab
+# chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
 
 if platform.system() == 'Linux':
-    chrome_opt.add_argument('--no-sandbox')
-    chrome_opt.add_argument('--headless') # it should be run without UI (Headless)
-    chrome_opt.add_argument('--disable-dev-shm-usage')
-    chrome_opt.add_argument('window-size=1920x1080')
-    chrome_opt.add_argument('disable-gpu')
-    
-    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
-    chrome_opt.add_argument(f'user-agent={user_agent}')
+    for _ in chrome_opt_dict['headless']:
+        chrome_opt.add_argument(_)
+    chrome_opt.add_argument(f'user-agent={chrome_opt_dict["user_agent"]}')
 
 
 class Crawler:
@@ -391,7 +387,7 @@ if __name__ == '__main__':
                     init_url = init_url,
                     solutions =solutions,
                     platform_string = platform_string)
-        crawler.driver.get('https://www.naver.com')
+        crawler.test_driver()
     else:
         raise NotImplementedError
     

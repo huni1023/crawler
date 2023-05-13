@@ -5,6 +5,10 @@ selen_path:
   laptop: C:\Users\jhun1\Dropbox\My PC (LAPTOP-VLNR6K8R)\Downloads\chromedriver_win32
   khrrc: C:\Users\snukh\Downloads\chromedriver
   ubuntu: /usr/bin/chromedriver
+chrome_option:
+  default: ['--blink-settings=imagesEnabled=false', 'window-size=1920x1080', 'disable-gpu']
+  headless: ['--no-sandbox', '--headless', '--disable-dev-shm-usage']
+  user_agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36
 solution:
   cafe: "cafe24.com"
   고도: "godo"
