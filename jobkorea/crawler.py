@@ -2,7 +2,6 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
 import os, sys, time
@@ -12,9 +11,17 @@ import argparse
 import warnings
 import shutil
 import platform
+import logging 
 import pandas as pd
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
+
+#now we will Create and configure logger 
+logging.basicConfig(filename="std.log", 
+					format='%(asctime)s %(message)s', 
+					filemode='w')
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG) 
 
 
 # set utils
@@ -24,8 +31,10 @@ if util_path not in sys.path:
 from utils.helper import load_config
 
 
-# load config file
 Project_PATH = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+Save_PATH = os.path.join(Project_PATH, 'jobkorea', 'result')
+
+# load config file
 CONFIG_PATH = "config.yaml"
 config = load_config(os.path.join(Project_PATH, 'jobkorea', CONFIG_PATH))
 raw_data = pd.read_excel(config['raw_data'], engine='openpyxl')
@@ -89,7 +98,7 @@ class Crawler:
         self.platform_string = platform_string
 
     def search_corporation(self, search_corporation ):
-        r"""search corporation title in search bar
+        r"""search corporation title in jobkorea search bar and get url
         """
         def string_to_int(string):
             new_str = re.sub('[^0-9]', '', string)
@@ -136,7 +145,7 @@ class Crawler:
             searched_corp_count = string_to_int(count_str)
 
             # table
-            tableEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[2]/div[2]/div/div[1]/ul')
+            tableEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
             corp_ls = tableEle.find_elements(By.TAG_NAME, 'li')
 
             if searched_corp_count == 0 :
@@ -161,8 +170,88 @@ class Crawler:
         except WebDriverException:
             return ['error', 'error']
     
+    def search_corporation_try2(self, search_corporation):
+        r"""상호열대치로 방법 교체
+        Parameters
+        ----------
+        search_corporation: str
+            검색할 회사명
+        """
+        rs = {'매출수': '', '사원수': '', '설립일': ''}
+        
+        def string_to_int(string):
+            new_str = re.sub('[^0-9]', '', string)
+            if new_str == '':
+                return 0
+            else:
+                return int(new_str)
+            
+        url_template = f'https://www.jobkorea.co.kr/Search/?stext=상호&tabType=corp&Page_No=1'
+
+        try:
+            self.driver.get(url_template.replace('상호', search_corporation))
+            
+
+            # table
+            tableDiv = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
+            tableEle = tableDiv.find_element(By.CLASS_NAME, 'list-default')
+            corp_ls = tableEle.find_elements(By.TAG_NAME, 'li')
+            self.driver.save_screenshot(os.path.join(Save_PATH, f'screenshot_{search_corporation}_after.png'))
+
+            # count corporation list
+            count_str = tableDiv.find_element(By.CLASS_NAME, 'filter-text').text
+            searched_corp_count = string_to_int(count_str)
+
+
+            if searched_corp_count == 0 :
+                return 'error' # no need for further crawling
+            else:
+                for idx, corporation in enumerate(corp_ls):
+                    a_tag = corporation.find_element(By.TAG_NAME, 'a')
+
+                    if idx == 0: # search only first row item, accuracy is suspected
+                        rs['크롤링된 회사명'] = a_tag.get_attribute('title')
+
+                        self.driver.get(a_tag.get_attribute('href'))
+                        self.driver.implicitly_wait(10)
+
+                        tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
+                        table_rows = tableEle.find_elements(By.TAG_NAME, 'tr')
+                        first_three_rows = table_rows[:3]
+                        
+                        # parsing data
+                        for idx, row in enumerate(first_three_rows):
+                            if idx == 0 :
+                                td_ls = row.find_elements(By.TAG_NAME, 'td')
+                                for idx, td in enumerate(td_ls):
+                                    if idx == 1:
+                                        employee_count_row = td
+                                        rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value').text
+                            elif idx == 1:
+                                td_ls = row.find_elements(By.TAG_NAME, 'td')
+                                for idx, td in enumerate(td_ls):
+                                    if idx == 1:
+                                        open_date = td
+                                        rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value').text
+                            elif idx == 2:
+                                td_ls = row.find_elements(By.TAG_NAME, 'td')
+                                for idx, td in enumerate(td_ls):
+                                    if idx == 1:
+                                        sales = td
+                                        rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value').text
+                        return rs
+            
+        except NoSuchElementException as e:
+            logger.error('noSuchElement')
+            return 'error'
+
+        except WebDriverException as e:
+            logger.error('webdriverError')
+            return 'error'
+
+
     def search_corporation_info(self, href):
-        r"""search corporation information
+        r"""search corporation information table
         """
         try:
             self.driver.get(href)
@@ -194,7 +283,9 @@ class Crawler:
             return rs
                 
 
-        except WebDriverException:
+        except WebDriverException as e:
+            print('>*>* error: ', e)
+            self.driver.save_screenshot(os.path.join(Save_PATH, 'screen_shot.png'))
             return {'매출수': 'error', '사원수': 'error', '설립일': 'error'}
 
 
