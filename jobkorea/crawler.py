@@ -21,7 +21,8 @@ logging.basicConfig(filename="std.log",
 					format='%(asctime)s %(message)s', 
 					filemode='w')
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG) 
+logger.setLevel(logging.ERROR) # error level logging
+logger.propagate = False # options for no output logs to console
 
 
 # set utils

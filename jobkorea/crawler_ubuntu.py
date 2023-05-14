@@ -161,6 +161,7 @@ def full_corporation(crawler_obj: Crawler, to_crawl_data):
             rs.loc[idx, '설립일'] = crawled['설립일']
             rs.loc[idx, '크롤링된회사명'] = crawled['크롤링된 회사명']
             crawled_cnt += 1
+            time.sleep(random.randint(0, 3))
         elif type(crawled) == str:
             rs.loc[idx, '매출수'] = 'error'
             rs.loc[idx, '사원수'] = 'error'
@@ -170,7 +171,6 @@ def full_corporation(crawler_obj: Crawler, to_crawl_data):
 
         # else:
         #     pass
-        time.sleep(random.randint(9))
     
         if idx % 2000 == 1999:
             toSend = f'{autoBot.cur_time} >> 중간점검({idx})\n크롤링된 것 수: {crawled_cnt}, 에러수: {error_cnt}'
