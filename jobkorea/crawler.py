@@ -9,7 +9,7 @@ import re
 import copy
 import argparse
 import warnings
-import shutil
+import math
 import platform
 import logging 
 import pandas as pd
@@ -98,7 +98,74 @@ class Crawler:
         self.solutions = solutions
         self.platform_string = platform_string
 
-    def search_corporation(self, search_corporation ):
+    def get_corporation_list(self, curPageNum):
+        r"""1. search corporation title in table list
+        Parameters
+        ----------
+        corporation_count: int
+            count of corporation
+        """
+        if curPageNum == 1:
+            table_div_xpath = '//*[@id="content"]/div/div/div[1]/div/div[3]'
+            tableDiv = self.driver.find_element(By.XPATH, table_div_xpath)
+            tableEle = tableDiv.find_element(By.CLASS_NAME, 'list-default')
+        else:
+            tableEle = self.driver.find_element(By.CLASS_NAME, 'list-default')
+
+        corp_ls_raw = tableEle.find_elements(By.TAG_NAME, 'li')
+        corp_ls = [corp for corp in corp_ls_raw if 'list-post' == corp.get_attribute('class')] # li에 채용정보가 걸리기도 해서 한번 걸러줌
+                    
+        return corp_ls
+
+    def get_corporation_href(self, corporation_list, search_corp_name):
+        r"""get corporation element element
+        Parameters
+        ----------
+        corporation_list: list of selenium object
+        search_corp_name: str
+        """
+        def cleaning_string(string):
+            return string.replace('㈜', '')
+        
+        def compare_two_string(string1, string2):
+            if string1.find(' ') != -1:
+                string1 = re.sub(' ', '', string1)
+            elif string2.find(' ') != -1:
+                string2 = re.sub(' ', '', string2)
+            else:
+                if string1 == string2:
+                    return True
+                else:
+                    return False
+            
+            if string1 == string2:
+                return True
+            else:
+                return False
+
+        for corporation in corporation_list:
+            a_tag = corporation.find_element(By.TAG_NAME, 'a')
+            corp_name = a_tag.get_attribute('title')
+            cleaned_corporation_name = cleaning_string(corp_name)
+            
+            if compare_two_string(search_corp_name, cleaned_corporation_name):
+                return {'크롤링된 회사명': corp_name, 'href': a_tag.get_attribute('href')}
+            else:
+                return '이름이 일치하는 기업 없음'
+
+    def get_next_pagination(self, curPageNum):
+        r"""click next page"""
+        if curPageNum == 1:
+            nextBtn = self.driver.find_element(By.XPATH, '/html/body/div[2]/div[2]/div/div/div[1]/div/div[3]/div[2]/div/div[2]/p/a')
+        else:
+            nextBtn = self.driver.find_element(By.XPATH, '/html/body/div/div[2]/p[2]/a') # 첫 페이지 이후부터는 페이지가 훨씬 간소화되서 제공됨, 파싱 방법이 바뀜
+
+        href = nextBtn.get_attribute('href')
+        self.driver.get(href)
+        self.driver.implicitly_wait(10) # wait 10seconds
+
+
+    def search_corporation(self, search_corporation):
         r"""search corporation title in jobkorea search bar and get url
         """
         def string_to_int(string):
@@ -179,75 +246,81 @@ class Crawler:
             검색할 회사명
         """
         rs = {'매출수': '', '사원수': '', '설립일': ''}
-        
-        def string_to_int(string):
-            new_str = re.sub('[^0-9]', '', string)
-            if new_str == '':
-                return 0
-            else:
-                return int(new_str)
+    
             
         url_template = f'https://www.jobkorea.co.kr/Search/?stext=상호&tabType=corp&Page_No=1'
 
         try:
             self.driver.get(url_template.replace('상호', search_corporation))
             
-
             # table
             tableDiv = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
-            tableEle = tableDiv.find_element(By.CLASS_NAME, 'list-default')
-            corp_ls = tableEle.find_elements(By.TAG_NAME, 'li')
-            self.driver.save_screenshot(os.path.join(Save_PATH, f'screenshot_{search_corporation}_after.png'))
 
             # count corporation list
-            count_str = tableDiv.find_element(By.CLASS_NAME, 'filter-text').text
-            searched_corp_count = string_to_int(count_str)
-
+            searched_corp_count = int(tableDiv.find_element(By.CLASS_NAME, 'dev_tot').text)
 
             if searched_corp_count == 0 :
-                return 'error' # no need for further crawling
+                return '검색결과 없음' # no need for further crawling
             else:
-                for idx, corporation in enumerate(corp_ls):
-                    a_tag = corporation.find_element(By.TAG_NAME, 'a')
+                full_page_cnt = math.ceil(searched_corp_count / 10)
+                if full_page_cnt == 1:
+                    corp_ls = Crawler.get_corporation_list(self, 1)
+                    to_crawl_corp_href = Crawler.get_corporation_href(self, corp_ls, search_corporation)
 
-                    if idx == 0: # search only first row item, accuracy is suspected
-                        rs['크롤링된 회사명'] = a_tag.get_attribute('title')
+                else:
+                    for idx in range(1, full_page_cnt+1):
+                        corp_ls = Crawler.get_corporation_list(self, curPageNum = idx)
+                        to_crawl_corp_href = Crawler.get_corporation_href(self, corp_ls, search_corporation)
 
-                        self.driver.get(a_tag.get_attribute('href'))
-                        self.driver.implicitly_wait(10)
+                        if type(to_crawl_corp_href) == dict:
+                            break
+                        else:
+                            Crawler.get_next_pagination(self, curPageNum = idx)
 
-                        tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
-                        table_rows = tableEle.find_elements(By.TAG_NAME, 'tr')
-                        first_three_rows = table_rows[:3]
-                        
-                        # parsing data
-                        for idx, row in enumerate(first_three_rows):
-                            if idx == 0 :
-                                td_ls = row.find_elements(By.TAG_NAME, 'td')
-                                for idx, td in enumerate(td_ls):
-                                    if idx == 1:
-                                        employee_count_row = td
-                                        rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value').text
-                            elif idx == 1:
-                                td_ls = row.find_elements(By.TAG_NAME, 'td')
-                                for idx, td in enumerate(td_ls):
-                                    if idx == 1:
-                                        open_date = td
-                                        rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value').text
-                            elif idx == 2:
-                                td_ls = row.find_elements(By.TAG_NAME, 'td')
-                                for idx, td in enumerate(td_ls):
-                                    if idx == 1:
-                                        sales = td
-                                        rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value').text
-                        return rs
-            
+                
+                if type(to_crawl_corp_href) == dict:
+                    rs['크롤링된 회사명'] = to_crawl_corp_href['크롤링된 회사명']
+                    self.driver.get(to_crawl_corp_href['href'])
+                    self.driver.implicitly_wait(10)
+
+                    tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
+                    table_rows = tableEle.find_elements(By.TAG_NAME, 'tr')
+                    first_three_rows = table_rows[:3]
+                    
+                    # parsing data
+                    for idx, row in enumerate(first_three_rows):
+                        if idx == 0 :
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    employee_count_row = td
+                                    rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value').text
+                        elif idx == 1:
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    open_date = td
+                                    rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value').text
+                        elif idx == 2:
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    sales = td
+                                    rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value').text
+                    return rs
+                elif type(to_crawl_corp_href) == str:
+                    return to_crawl_corp_href
+                else:
+                    raise NotImplementedError
+
         except NoSuchElementException as e:
             logger.error('noSuchElement')
+            # self.driver.quit()
             return 'error'
 
         except WebDriverException as e:
             logger.error('webdriverError')
+            # self.driver.quit()
             return 'error'
 
 
@@ -286,7 +359,7 @@ class Crawler:
 
         except WebDriverException as e:
             print('>*>* error: ', e)
-            self.driver.save_screenshot(os.path.join(Save_PATH, 'screen_shot.png'))
+            # self.driver.save_screenshot(os.path.join(Save_PATH, 'screen_shot.png'))
             return {'매출수': 'error', '사원수': 'error', '설립일': 'error'}
 
 

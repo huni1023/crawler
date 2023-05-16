@@ -45,7 +45,14 @@ class Validator:
         else:
             raise ValueError('>> something wrong, check values: ', unique_val)
         
+    def task1(self):
+        r"""Validation of jobkorea crawling
+        """
+        df_error = self.df[self.df['매출수'] == 'error']
+        print('>> error: ', df_error.shape[0])
 
+        return self.df #!# 단순히 다시 토함
+        
 
 
 if __name__ == '__main__':
