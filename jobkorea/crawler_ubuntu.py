@@ -224,7 +224,7 @@ def corporation_errorHandling(crawler_obj: Crawler, to_crawl_data):
     crawled_cnt = 0
     error_cnt = 0
 
-    for idx, row in tqdm(enumerate(to_crawl_data.iterrows())):
+    for idx, row in tqdm(to_crawl_data.iterrows()):
         if row['매출수'] == 'error':
             corp_name = row['상호']
             crawled = crawler_obj.search_corporation_try2(corp_name)
@@ -241,6 +241,8 @@ def corporation_errorHandling(crawler_obj: Crawler, to_crawl_data):
                 rs.loc[idx, '설립일'] = crawled
                 rs.loc[idx, '크롤링된회사명'] = crawled
                 error_cnt += 1
+        else:
+            pass
         
         if idx % 2000 == 1999:
             toSend = f'{autoBot.cur_time} >> 중간점검({idx})\n크롤링된 것 수: {crawled_cnt}, 에러수: {error_cnt}'
@@ -297,5 +299,5 @@ if __name__ == '__main__':
     # main(arg='전체 크롤링: 쇼핑몰')
     # main(arg='추가 크롤링: 쇼핑몰')
     # main(arg='전체 잡코리아')
-    main(arg='잡코리아 테스트')
-    # main(arg='추가 크롤링: 잡코리아')
+    # main(arg='잡코리아 테스트')
+    main(arg='추가 크롤링: 잡코리아')

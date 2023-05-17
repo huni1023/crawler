@@ -245,6 +245,12 @@ class Crawler:
         search_corporation: str
             검색할 회사명
         """
+        def string_to_int(string):
+            new_str = re.sub('[^0-9]', '', string)
+            if new_str == '':
+                return 0
+            else:
+                return int(new_str)
         rs = {'매출수': '', '사원수': '', '설립일': ''}
     
             
@@ -257,7 +263,7 @@ class Crawler:
             tableDiv = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
 
             # count corporation list
-            searched_corp_count = int(tableDiv.find_element(By.CLASS_NAME, 'dev_tot').text)
+            searched_corp_count = string_to_int(tableDiv.find_element(By.CLASS_NAME, 'dev_tot').text)
 
             if searched_corp_count == 0 :
                 return '검색결과 없음' # no need for further crawling

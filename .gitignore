@@ -52,3 +52,7 @@ docs/_build/
 # etc
 jobkorea/crawler_ubuntu.py:Zone.Identifier
 jobkorea/crawler_ubuntu.py:com.dropbox.attrs
+jobkorea/__pycache__/crawler.cpython-38.pyc
+utils/config.yamlZone.Identifier
+jobkorea/__pycache__/crawler.cpython-38.pyc
+utils/__pycache__/helper.cpython-38.pyc
