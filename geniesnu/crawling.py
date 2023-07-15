@@ -2,9 +2,12 @@ import os
 import sys
 import time
 import platform
+import math
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import date
+from tqdm import tqdm
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -98,42 +101,57 @@ class snugenie_crawler(Cralwer):
 
         # 과목 수
         subject_cnt_ele = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[3]')
-        subject_cnt = subject_cnt_ele.find_element(By.TAG_NAME, 'strong').text
+        subject_cnt = int(subject_cnt_ele.find_element(By.TAG_NAME, 'strong').text)
         print('과목수: ', subject_cnt)
 
-        # 과목 크롤링
-        result_box = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[4]/div[1]')
-        result_ls = result_box.find_elements(By.TAG_NAME, 'div')
-        
+        subject_per_page = 20
+        page_count = math.ceil(subject_cnt/subject_per_page)
         title_ls = []
         href_ls = []
-        for one_sbj in result_ls:
-            sbj_title = one_sbj.find_element(By.CLASS_NAME, 'title').text
-            title_ls.append(sbj_title)
+        
+        for page_idx in tqdm(range(page_count), '>> crawling start'):
+            if page_idx < 3:
+                # 과목 크롤링
+                result_box = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[4]/div[1]')
+                result_ls = result_box.find_elements(By.TAG_NAME, 'div')
+                
+                for one_sbj in result_ls:
+                    sbj_title = one_sbj.find_element(By.CLASS_NAME, 'title').text
+                    title_ls.append(sbj_title)
 
-            for idx, a_tag in enumerate(one_sbj.find_elements(By.TAG_NAME, 'a')):
-                if idx == 0 :
-                    href_ls.append(a_tag.get_attribute('href'))
+                    for idx, a_tag in enumerate(one_sbj.find_elements(By.TAG_NAME, 'a')):
+                        if idx == 0 :
+                            href_ls.append(a_tag.get_attribute('href'))
+                
+                # click next page
+                if page_idx < page_count:
+                    next_page = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[4]/div[2]/span[3]/a[1]')
+                    print(next_page.get_attribute('href'))
+                    next_page.click()
+            else:
+                pass
         
         rs['title'] = title_ls
         rs['href'] = href_ls
-        print(rs.head())
 
-        print('>> search done')
+        print('>> search done: ', rs.shape)
 
         return rs
         
 
-
-
-        
-
-if __name__ == '__main__':
+def main():
     crawler = snugenie_crawler(url='https://snugenie.snu.ac.kr')
     crawler.login(ID= os.environ.get('mysnu-id'),
           PW= os.environ.get('mysnu-pw'))
     rs = crawler.search_word('개론')
     crawler.driver.close()
 
-    rs.to_excel('./result.xlsx')
+     
+    today = date.today().isoformat()
+    rs.to_excel(f'./result/{today}_result.xlsx', index=False)
+
+        
+
+if __name__ == '__main__':
+    main()
     
