@@ -110,7 +110,7 @@ class snugenie_crawler(Cralwer):
         href_ls = []
         
         for page_idx in tqdm(range(page_count), '>> crawling start'):
-            if page_idx < 3:
+            try:
                 # 과목 크롤링
                 result_box = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[4]/div[1]')
                 result_ls = result_box.find_elements(By.TAG_NAME, 'div')
@@ -128,8 +128,10 @@ class snugenie_crawler(Cralwer):
                     next_page = self.driver.find_element(By.XPATH, '/html/body/div/div/div/div/section[4]/div[2]/span[3]/a[1]')
                     print(next_page.get_attribute('href'))
                     next_page.click()
-            else:
-                pass
+            except:
+                title_ls.append('error')
+                href_ls.append('error')
+            
         
         rs['title'] = title_ls
         rs['href'] = href_ls
