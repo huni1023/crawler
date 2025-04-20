@@ -1,2 +1,5 @@
 raw_data.csv
 *.xlsx
+!raw_data(convert).xlsx
+.ipynb_checkpoints/
+*.png

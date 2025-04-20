@@ -2,7 +2,6 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
 import os, sys, time
@@ -10,10 +9,20 @@ import re
 import copy
 import argparse
 import warnings
-import shutil
+import math
+import platform
+import logging 
 import pandas as pd
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
+
+#now we will Create and configure logger 
+logging.basicConfig(filename="std.log", 
+					format='%(asctime)s %(message)s', 
+					filemode='w')
+logger = logging.getLogger()
+logger.setLevel(logging.ERROR) # error level logging
+logger.propagate = False # options for no output logs to console
 
 
 # set utils
@@ -23,13 +32,16 @@ if util_path not in sys.path:
 from utils.helper import load_config
 
 
-# load config file
 Project_PATH = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+Save_PATH = os.path.join(Project_PATH, 'jobkorea', 'result')
+
+# load config file
 CONFIG_PATH = "config.yaml"
 config = load_config(os.path.join(Project_PATH, 'jobkorea', CONFIG_PATH))
 raw_data = pd.read_excel(config['raw_data'], engine='openpyxl')
 init_url = config['init_url']
 selen_path_dict = config['selen_path']
+chrome_opt_dict = config['chrome_option']
 solutions = config['solution']
 platform_string = config['platform']
 
@@ -41,18 +53,25 @@ parser.add_argument('--laptop', action='store_true',
                     help="crawling on laptop device")
 parser.add_argument('--khrrc', action='store_true',
                     help="crawling on khrrc device")
+parser.add_argument('--ubuntu', action='store_true',
+                    help="crawling on ubuntu device")
 parser.add_argument('--save', action='store_true',
                     help="save result")
-args = parser.parse_args('') #!# jupytor notebook case
-# args = parser.parse_args()
+# args = parser.parse_args('') #!# jupytor notebook case
+args = parser.parse_args()
 
 
 # chrome option
 chrome_opt = webdriver.ChromeOptions()
-prefs = {"profile.managed_default_content_settings.images": 2}
-chrome_opt.add_experimental_option("prefs", prefs) 
-chrome_opt.add_experimental_option("detach", True) # prevent automatically closed tab
-chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
+for _ in chrome_opt_dict['default']:
+    chrome_opt.add_argument(_)
+# chrome_opt.add_experimental_option("detach", True) # prevent automatically closed tab
+# chrome_opt.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+if platform.system() == 'Linux':
+    for _ in chrome_opt_dict['headless']:
+        chrome_opt.add_argument(_)
+    chrome_opt.add_argument(f'user-agent={chrome_opt_dict["user_agent"]}')
 
 
 class Crawler:
@@ -79,8 +98,75 @@ class Crawler:
         self.solutions = solutions
         self.platform_string = platform_string
 
-    def search_corporation(self, search_corporation ):
-        r"""search corporation title in search bar
+    def get_corporation_list(self, curPageNum):
+        r"""1. search corporation title in table list
+        Parameters
+        ----------
+        corporation_count: int
+            count of corporation
+        """
+        if curPageNum == 1:
+            table_div_xpath = '//*[@id="content"]/div/div/div[1]/div/div[3]'
+            tableDiv = self.driver.find_element(By.XPATH, table_div_xpath)
+            tableEle = tableDiv.find_element(By.CLASS_NAME, 'list-default')
+        else:
+            tableEle = self.driver.find_element(By.CLASS_NAME, 'list-default')
+
+        corp_ls_raw = tableEle.find_elements(By.TAG_NAME, 'li')
+        corp_ls = [corp for corp in corp_ls_raw if 'list-post' == corp.get_attribute('class')] # li에 채용정보가 걸리기도 해서 한번 걸러줌
+                    
+        return corp_ls
+
+    def get_corporation_href(self, corporation_list, search_corp_name):
+        r"""get corporation element element
+        Parameters
+        ----------
+        corporation_list: list of selenium object
+        search_corp_name: str
+        """
+        def cleaning_string(string):
+            return string.replace('㈜', '')
+        
+        def compare_two_string(string1, string2):
+            if string1.find(' ') != -1:
+                string1 = re.sub(' ', '', string1)
+            elif string2.find(' ') != -1:
+                string2 = re.sub(' ', '', string2)
+            else:
+                if string1 == string2:
+                    return True
+                else:
+                    return False
+            
+            if string1 == string2:
+                return True
+            else:
+                return False
+
+        for corporation in corporation_list:
+            a_tag = corporation.find_element(By.TAG_NAME, 'a')
+            corp_name = a_tag.get_attribute('title')
+            cleaned_corporation_name = cleaning_string(corp_name)
+            
+            if compare_two_string(search_corp_name, cleaned_corporation_name):
+                return {'크롤링된 회사명': corp_name, 'href': a_tag.get_attribute('href')}
+            else:
+                return '이름이 일치하는 기업 없음'
+
+    def get_next_pagination(self, curPageNum):
+        r"""click next page"""
+        if curPageNum == 1:
+            nextBtn = self.driver.find_element(By.XPATH, '/html/body/div[2]/div[2]/div/div/div[1]/div/div[3]/div[2]/div/div[2]/p/a')
+        else:
+            nextBtn = self.driver.find_element(By.XPATH, '/html/body/div/div[2]/p[2]/a') # 첫 페이지 이후부터는 페이지가 훨씬 간소화되서 제공됨, 파싱 방법이 바뀜
+
+        href = nextBtn.get_attribute('href')
+        self.driver.get(href)
+        self.driver.implicitly_wait(10) # wait 10seconds
+
+
+    def search_corporation(self, search_corporation):
+        r"""search corporation title in jobkorea search bar and get url
         """
         def string_to_int(string):
             new_str = re.sub('[^0-9]', '', string)
@@ -127,7 +213,7 @@ class Crawler:
             searched_corp_count = string_to_int(count_str)
 
             # table
-            tableEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[2]/div[2]/div/div[1]/ul')
+            tableEle = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
             corp_ls = tableEle.find_elements(By.TAG_NAME, 'li')
 
             if searched_corp_count == 0 :
@@ -152,8 +238,100 @@ class Crawler:
         except WebDriverException:
             return ['error', 'error']
     
+    def search_corporation_try2(self, search_corporation):
+        r"""상호열대치로 방법 교체
+        Parameters
+        ----------
+        search_corporation: str
+            검색할 회사명
+        """
+        def string_to_int(string):
+            new_str = re.sub('[^0-9]', '', string)
+            if new_str == '':
+                return 0
+            else:
+                return int(new_str)
+        rs = {'매출수': '', '사원수': '', '설립일': ''}
+    
+            
+        url_template = f'https://www.jobkorea.co.kr/Search/?stext=상호&tabType=corp&Page_No=1'
+
+        try:
+            self.driver.get(url_template.replace('상호', search_corporation))
+            
+            # table
+            tableDiv = self.driver.find_element(By.XPATH, '//*[@id="content"]/div/div/div[1]/div/div[3]')
+
+            # count corporation list
+            searched_corp_count = string_to_int(tableDiv.find_element(By.CLASS_NAME, 'dev_tot').text)
+
+            if searched_corp_count == 0 :
+                return '검색결과 없음' # no need for further crawling
+            else:
+                full_page_cnt = math.ceil(searched_corp_count / 10)
+                if full_page_cnt == 1:
+                    corp_ls = Crawler.get_corporation_list(self, 1)
+                    to_crawl_corp_href = Crawler.get_corporation_href(self, corp_ls, search_corporation)
+
+                else:
+                    for idx in range(1, full_page_cnt+1):
+                        corp_ls = Crawler.get_corporation_list(self, curPageNum = idx)
+                        to_crawl_corp_href = Crawler.get_corporation_href(self, corp_ls, search_corporation)
+
+                        if type(to_crawl_corp_href) == dict:
+                            break
+                        else:
+                            Crawler.get_next_pagination(self, curPageNum = idx)
+
+                
+                if type(to_crawl_corp_href) == dict:
+                    rs['크롤링된 회사명'] = to_crawl_corp_href['크롤링된 회사명']
+                    self.driver.get(to_crawl_corp_href['href'])
+                    self.driver.implicitly_wait(10)
+
+                    tableEle = self.driver.find_element(By.XPATH, '//*[@id="company-body"]/div[1]/div[1]/div/table')
+                    table_rows = tableEle.find_elements(By.TAG_NAME, 'tr')
+                    first_three_rows = table_rows[:3]
+                    
+                    # parsing data
+                    for idx, row in enumerate(first_three_rows):
+                        if idx == 0 :
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    employee_count_row = td
+                                    rs['사원수'] = employee_count_row.find_element(By.CLASS_NAME, 'value').text
+                        elif idx == 1:
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    open_date = td
+                                    rs['설립일'] = open_date.find_element(By.CLASS_NAME, 'value').text
+                        elif idx == 2:
+                            td_ls = row.find_elements(By.TAG_NAME, 'td')
+                            for idx, td in enumerate(td_ls):
+                                if idx == 1:
+                                    sales = td
+                                    rs['매출수'] = sales.find_element(By.CLASS_NAME, 'value').text
+                    return rs
+                elif type(to_crawl_corp_href) == str:
+                    return to_crawl_corp_href
+                else:
+                    raise NotImplementedError
+
+        except NoSuchElementException as e:
+            logger.error('noSuchElement')
+            # self.driver.quit()
+            return 'error'
+
+        except WebDriverException as e:
+            logger.error('webdriverError')
+            # self.driver.quit()
+            return 'error'
+
+
     def search_corporation_info(self, href):
-        r"""search corporation information
+        r"""search corporation information table
         """
         try:
             self.driver.get(href)
@@ -185,7 +363,9 @@ class Crawler:
             return rs
                 
 
-        except WebDriverException:
+        except WebDriverException as e:
+            print('>*>* error: ', e)
+            # self.driver.save_screenshot(os.path.join(Save_PATH, 'screen_shot.png'))
             return {'매출수': 'error', '사원수': 'error', '설립일': 'error'}
 
 
@@ -223,9 +403,9 @@ class Crawler:
                 else:
                     pass
                 
-                # in case of nothing
-                if len(result['사용솔루션']) == 0:
-                    result['사용솔루션'] = 'N'
+            # in case of nothing
+            if result['사용솔루션'] == '':
+                result['사용솔루션'] = 'N'
             
             # search platform
             for platform in self.platform_string:
@@ -234,6 +414,7 @@ class Crawler:
                     break 
                 else:
                     pass
+            # in case of nothing
             if result['플랫폼입점여부'] == '':
                 result['플랫폼입점여부'] += 'N'
 
@@ -244,40 +425,18 @@ class Crawler:
             result['채널톡사용여부'] = 'error'
             return result
     
-    
-    #!# in case of emergency
-    def search_platform(self, shopping_mall_url):
-        r"""search platform based on previous result
-        Parameters
-        ----------
-        shopping_mall_url: str
-            url of shopping mall
-        """
-        result = {'플랫폼입점여부': ''}
 
-        # enter url
-        try:            
-            self.driver.get(url = shopping_mall_url)
-            html = self.driver.page_source
-            
-            # search platform
-            for platform in self.platform_string:
-                if html.find(platform) != -1:
-                    result['플랫폼입점여부'] += 'Y'
-                    break 
-                else:
-                    pass
-            if result['플랫폼입점여부'] == '':
-                result['플랫폼입점여부'] += 'N'
-
-            return result
-        except WebDriverException:
-            result['플랫폼입점여부'] = 'error'
-            return result
-
+    def test_driver(self):
+        r"""test function: chrome webdriver"""
+        self.driver.get('https://www.naver.com')
+        if 'https://www.naver.com/' == self.driver.current_url:
+            return print('>> test passed: chrome webdriver')
+        else:
+            raise ValueError('** test failed: chrome webdriver')
 
 class Utills:
     def __init__(self, raw_data):
+        r"""helper function cleaning data"""
         self.raw_data = raw_data
 
     def clear_useless_text(self, column_name):
@@ -299,26 +458,31 @@ class Utills:
         for column in column_ls:
             rs[column] = '' 
         
+        self.cleaned_data = rs
         return rs
 
-    def cleaning_url(self, data):
-        r"""add https:// in url
+    
+    def cleanUrl(self):
+        r"""cleaning url
         Parameters
         ----------
-        data: pd.Dataframe
-            pandas dataframe
         """
-        rs = copy.deepcopy(data)
+        rs = copy.deepcopy(self.raw_data)
         new_url_ls = list()
         for url in rs['도메인명']:
-            if url[:8] != 'https://':
-                new_url_ls.append('https://' + url)
-            elif url[:7] == 'http://':
-                new_url_ls.append('https://' + url)
+            if url.find('http') != -1:
+                # case1. http
+                if url[:7] == 'http://':
+                    new_url_ls.append('https://' + url[7:])
+                else:
+                    new_url_ls.append(url)
+            
+            # case2. no http
             else:
-                new_url_ls.append(url)
+                new_url_ls.append('https://' + url)
         
         rs['도메인명'] = new_url_ls
+        self.cleaned_data = rs
         return rs
 
     def compare_progress(self, target, interrupted_data, column):
@@ -364,6 +528,17 @@ if __name__ == '__main__':
                           init_url=init_url, 
                           solutions = solutions,
                           platform_string = platform_string)
+    elif args.ubuntu:
+        crawler = Crawler(selen_path= selen_path_dict['ubuntu'],
+                    chromeOption = chrome_opt,
+                    init_url = init_url,
+                    solutions =solutions,
+                    platform_string = platform_string)
+        crawler.test_driver()
+
+        utils = Utills(raw_data = raw_data)
+        utils.cleanUrl()
+        
     else:
         raise NotImplementedError
     
